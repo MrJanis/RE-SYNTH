@@ -1,0 +1,20 @@
+RE-SYNTH v0.5.1 — INSTALLER BUILD SOURCE, NOT INSTALLERS
+===========================================================
+
+NO WINDOWS .EXE OR MAC .PKG IS INCLUDED IN THIS ZIP.
+
+Windows installer: RE-SYNTH-Setup-Windows.exe (requires Windows native compile)
+Mac installer:     RE-SYNTH-Installer-macOS.pkg (requires macOS native compile)
+
+To generate both on GitHub (if the native builds succeed):
+1. Create a repository on GitHub.
+2. Upload every file in the RE-SYNTH folder to repository root,
+   including .github/workflows/native-plugins.yml.
+3. Use Actions > Build RE-SYNTH installers (Windows EXE / macOS PKG) > Run workflow.
+4. Download the artifacts RE-SYNTH-Windows-Installer and RE-SYNTH-macOS-Installer.
+5. Run the resulting installer on its matching OS, and restart the DAW.
+
+The two native builds and installers have not been validated.
+This is for developer testing, not signed/notarized commercial distribution.
+If the workflow fails, its compiler log will show what must be corrected.
+Read README.md for details.
