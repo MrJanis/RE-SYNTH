@@ -30,7 +30,9 @@ public:
     void pitchWheelMoved(int wheel) override {
         bend = std::pow(2.0, ((wheel - 8192) / 8192.0) * 2.0 / 12.0);
     }
-    void controllerMoved(int, int) override {}
+    void controllerMoved(int controller, int value) override {
+        if (controller == 1) modulation = juce::jlimit(0.f, 1.f, value / 127.f);
+    }
     void setVoiceSampleRate(double s) { env.setSampleRate(s); renderer.prepare(s); }
     void setEnvelope(const juce::ADSR::Parameters& p) { env.setParameters(p); }
     void setTimbreLock(float amount) { renderer.setTimbreLock(amount); }
@@ -41,7 +43,9 @@ public:
         for(int n=0;n<count;++n) {
             const float ampEnv=env.getNextSample();
             if(!env.isActive()){clearCurrentNote();model.reset();break;}
-            const double baseHz=frequency*bend;
+            // Modulation wheel (MIDI CC1) adds up to ~30 cents of 5.5 Hz vibrato.
+            const double vibrato = 1.0 + 0.0175 * modulation * std::sin(twoPi * 5.5 * elapsed);
+            const double baseHz=frequency*bend*vibrato;
             const float sample=renderer.renderSample(model->spectrum,baseHz,elapsed);
             // Clean gain stage, avoiding soft-clipping of the natural transient.
             const float outSample=sample*static_cast<float>(gain)*ampEnv;
@@ -56,6 +60,7 @@ private:
     juce::ADSR env;
     rs::dsp::AdditiveRenderer renderer;
     double frequency=440.0,bend=1.0,elapsed=0.0,gain=0.0;
+    float modulation=0.f;
 };
 float param(const juce::AudioProcessorValueTreeState& p, const char* id) {return p.getRawParameterValue(id)->load();}
 }
@@ -117,6 +122,26 @@ void ReSynthAudioProcessor::prepareToPlay(double sampleRate, int maxBlockSize) {
 void ReSynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
+    if (buffer.getNumSamples() <= 0) return;
+    // Inject UI keyboard notes into the same MIDI stream as DAW notes.
+    keyboardState.processNextMidiBuffer(midi, 0, buffer.getNumSamples(), true);
+    // Pitch and mod wheel changes are real MIDI messages consumed by the synth.
+    const int pitch = uiPitchWheel.load(std::memory_order_relaxed);
+    const int mod = uiModWheel.load(std::memory_order_relaxed);
+    if (pitch != appliedUiPitch) {
+        midi.addEvent(juce::MidiMessage::pitchWheel(1, pitch), 0);
+        appliedUiPitch = pitch;
+    }
+    if (mod != appliedUiMod) {
+        midi.addEvent(juce::MidiMessage::controllerEvent(1, 1, mod), 0);
+        appliedUiMod = mod;
+    }
+    for (const auto event : midi) {
+        const auto& msg = event.getMessage();
+        if (msg.isPitchWheel()) incomingPitchWheel.store(msg.getPitchWheelValue(), std::memory_order_relaxed);
+        if (msg.isController() && msg.getControllerNumber()==1)
+            incomingModWheel.store(msg.getControllerValue(), std::memory_order_relaxed);
+    }
     // A/B is an offline-analyzed, level-matched MONO preview. It bypasses all
     // instrument FX/master colors for meaningful reconstruction comparison.
     const int selected=previewMode.load(std::memory_order_acquire);
