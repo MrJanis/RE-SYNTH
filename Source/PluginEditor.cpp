@@ -11,8 +11,8 @@ ReSynthAudioProcessorEditor::ReSynthAudioProcessorEditor(ReSynthAudioProcessor& 
     addAndMakeVisible(title);
     status.setText("Ready — import one pitched note",juce::dontSendNotification);
     status.setColour(juce::Label::textColourId,cyan);addAndMakeVisible(status);
-    sampleInfo.setText("No sample loaded",juce::dontSendNotification);addAndMakeVisible(sampleInfo);
-    rootInfo.setText("Root: C4 (default sine)",juce::dontSendNotification);addAndMakeVisible(rootInfo);
+    sampleInfo.setText("No audio loaded: choose one WAV or AIFF note",juce::dontSendNotification);addAndMakeVisible(sampleInfo);
+    rootInfo.setText("Root note: set after import",juce::dontSendNotification);addAndMakeVisible(rootInfo);
     addAndMakeVisible(importButton); addAndMakeVisible(acceptButton);addAndMakeVisible(saveButton);
     addAndMakeVisible(viewButton);
     addAndMakeVisible(originalButton);addAndMakeVisible(resynthButton);addAndMakeVisible(stopButton);
@@ -32,7 +32,7 @@ ReSynthAudioProcessorEditor::ReSynthAudioProcessorEditor(ReSynthAudioProcessor& 
                 if(safe && fc.getResult().existsAsFile())safe->loadSound(fc.getResult());
             });
     };
-    viewButton.onClick=[this]{spectralView=!spectralView;viewButton.setButtonText(spectralView ? "VIEW: EVOLUTION" : "VIEW: PARTIALS");repaint();};
+    viewButton.onClick=[this]{spectralView=!spectralView;viewButton.setButtonText(spectralView ? "SHOW PARTIALS" : "SHOW EVOLUTION");repaint();};
     for (int midi=0;midi<128;++midi)
         rootSelector.addItem(juce::MidiMessage::getMidiNoteName(midi,true,true,3),midi+1);
     if(auto current=processor.currentModel())rootSelector.setSelectedId(current->rootMidi+1,juce::dontSendNotification);
@@ -41,7 +41,7 @@ ReSynthAudioProcessorEditor::ReSynthAudioProcessorEditor(ReSynthAudioProcessor& 
     addAndMakeVisible(rootSelector);
     acceptButton.setEnabled(false);
     importButton.onClick=[this] {
-        chooser=std::make_unique<juce::FileChooser>("Choose a pitched note",juce::File{},"*");
+        chooser=std::make_unique<juce::FileChooser>("Choose one WAV or AIFF note",juce::File{},"*");
         chooser->launchAsync(juce::FileBrowserComponent::openMode|juce::FileBrowserComponent::canSelectFiles,
           [safe=juce::Component::SafePointer<ReSynthAudioProcessorEditor>(this)](const juce::FileChooser& fc) {
             if(safe && fc.getResult().existsAsFile()) safe->importFile(fc.getResult());
@@ -243,13 +243,31 @@ void ReSynthAudioProcessorEditor::resized() {
     midiInfo.setBounds(582,483,180,19);
     keyboard.setBounds(209,512,553,53);
 }
-bool ReSynthAudioProcessorEditor::isInterestedInFileDrag(const juce::StringArray& files) {return files.size()>0 && juce::File(files[0]).hasFileExtension("wav;aif;aiff");}
-void ReSynthAudioProcessorEditor::filesDropped(const juce::StringArray& files,int,int) {if(!files.isEmpty())importFile(juce::File(files[0]));}
+bool ReSynthAudioProcessorEditor::isInterestedInFileDrag(const juce::StringArray& files) {
+    for (const auto& path : files)
+        if (juce::File(path).hasFileExtension("wav;wave;aif;aiff")) return true;
+    return false;
+}
+void ReSynthAudioProcessorEditor::filesDropped(const juce::StringArray& files,int,int) {
+    for (const auto& path : files) {
+        const juce::File file(path);
+        if (file.hasFileExtension("wav;wave;aif;aiff")) {importFile(file);return;}
+    }
+}
 void ReSynthAudioProcessorEditor::importFile(const juce::File& file) {
     processor.stopPreview();
+    if (!file.hasFileExtension("wav;wave;aif;aiff")) {
+        status.setText("Choose a WAV or AIFF file",juce::dontSendNotification);
+        return;
+    }
     status.setText("Analyzing " + file.getFileName() + "...",juce::dontSendNotification);
     auto result=rs::analyzeFile(file);
-    if (!result.model) {status.setText("Analysis failed: "+result.error,juce::dontSendNotification);return;}
+    if (!result.model) {
+        status.setText("Import failed: " + result.error,juce::dontSendNotification);
+        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
+                                                "RE-SYNTH cannot analyze this note",result.error);
+        return;
+    }
     pending=result.model;waveform=std::move(result.waveform);hasPending=true;acceptButton.setEnabled(true);
     const double quality=result.quality.spectralErrorDb;
     qaInfo.setText("Log-spectrum deviation: "+juce::String(quality,1)+" dB (lower is better)",juce::dontSendNotification);
@@ -267,9 +285,13 @@ void ReSynthAudioProcessorEditor::importFile(const juce::File& file) {
     processor.installPreview(std::move(preview));
     originalButton.setEnabled(true);resynthButton.setEnabled(true);stopButton.setEnabled(true);
     sampleInfo.setText(juce::String(result.duration,2)+" s  |  "+juce::String(result.sampleRate,0)+" Hz",juce::dontSendNotification);
-    rootInfo.setText("Detected: "+juce::MidiMessage::getMidiNoteName(pending->rootMidi,true,true,3),juce::dontSendNotification);
+    rootInfo.setText(result.pitchAutoDetected
+        ? "Detected: " + juce::MidiMessage::getMidiNoteName(pending->rootMidi,true,true,3)
+        : "Pitch uncertain: set ROOT NOTE",juce::dontSendNotification);
     rootSelector.setSelectedId(pending->rootMidi+1,juce::dontSendNotification);
-    status.setText("Analysis complete — accept resynthesis",juce::dontSendNotification);
+    status.setText(result.pitchAutoDetected
+        ? "Analysis complete - compare A/B then ACCEPT"
+        : "Analysis complete - SET ROOT NOTE before ACCEPT",juce::dontSendNotification);
     repaint();
 }
 void ReSynthAudioProcessorEditor::accept() {
@@ -328,4 +350,11 @@ void ReSynthAudioProcessorEditor::saveSound() {
     if(dest.replaceWithData(stream.getData(),stream.getDataSize()))status.setText("Saved: "+dest.getFileName(),juce::dontSendNotification);
     else status.setText("Sound save failed",juce::dontSendNotification);
 }
-void ReSynthAudioProcessorEditor::timerCallback(){int v=processor.lastNote.exchange(-1);if(v>=0&&v!=note){note=v;status.setText("MIDI: "+juce::MidiMessage::getMidiNoteName(v,true,true,3),juce::dontSendNotification);}}
+void ReSynthAudioProcessorEditor::timerCallback() {
+    const int v=processor.lastNote.exchange(-1);
+    if(v>=0) {
+        note=v;
+        midiInfo.setText("MIDI: "+juce::MidiMessage::getMidiNoteName(v,true,true,3),
+                         juce::dontSendNotification);
+    }
+}
