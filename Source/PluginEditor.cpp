@@ -119,6 +119,21 @@ void ReSynthAudioProcessorEditor::setupSlider(juce::Slider& s,const juce::String
     juce::ignoreUnused(attachment);
     s.setDoubleClickReturnValue(true,s.getValue());
 }
+void ReSynthAudioProcessorEditor::showControlsPage(int page) {
+    controlsPage=juce::jlimit(0,2,page);
+    for(auto* control : {&attack,&decay,&sustain,&release})
+        control->setVisible(controlsPage==0);
+    for(auto* control : {&fx1,&fx2,&fx3})
+        control->setVisible(controlsPage==1);
+    effects.setVisible(controlsPage==1);
+    for(auto* control : {&volume,&colorDrive,&timbreLock})
+        control->setVisible(controlsPage==2);
+    colors.setVisible(controlsPage==2);
+    envelopeTab.setToggleState(controlsPage==0,juce::dontSendNotification);
+    effectsTab.setToggleState(controlsPage==1,juce::dontSendNotification);
+    masterTab.setToggleState(controlsPage==2,juce::dontSendNotification);
+    repaint();
+}
 void ReSynthAudioProcessorEditor::setKeyboardOctave(int offset) {
     octaveOffset=juce::jlimit(-3,3,offset);
     const int low=60+12*octaveOffset;
