@@ -24,6 +24,7 @@ struct AnalysisResult {
     qa::Report quality;
     double duration=0.;
     double sampleRate=0.;
+    bool pitchAutoDetected=true;
 };
 // OFFLINE ONLY. Never perform analysis in an audio callback.
 AnalysisResult analyzeFile(const juce::File& file);
