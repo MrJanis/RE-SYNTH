@@ -1,7 +1,7 @@
 #include "PluginEditor.h"
 
 namespace {
-constexpr auto bg=juce::Colour(0xff10171e), panel=juce::Colour(0xff1b2731), cyan=juce::Colour(0xff5ce0d5), orange=juce::Colour(0xffffa33b);
+const auto bg=juce::Colour(0xff10171e), panel=juce::Colour(0xff1b2731), cyan=juce::Colour(0xff5ce0d5), orange=juce::Colour(0xffffa33b);
 }
 ReSynthAudioProcessorEditor::ReSynthAudioProcessorEditor(ReSynthAudioProcessor& p) : AudioProcessorEditor(&p), processor(p) {
     setSize(800,600);
