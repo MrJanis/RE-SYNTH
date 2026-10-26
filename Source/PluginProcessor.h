@@ -39,7 +39,15 @@ public:
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
     static juce::StringArray effectNames();
     std::atomic<int> lastNote { -1 };
+    // MIDI keyboard state serves both on-screen keys and incoming DAW MIDI.
+    juce::MidiKeyboardState keyboardState;
+    void setUiPitchWheel(int value) { uiPitchWheel.store(juce::jlimit(0,16383,value)); }
+    void setUiModWheel(int value) { uiModWheel.store(juce::jlimit(0,127,value)); }
+    std::atomic<int> incomingPitchWheel { 8192 };
+    std::atomic<int> incomingModWheel { 0 };
 private:
+    std::atomic<int> uiPitchWheel {8192}, uiModWheel {0};
+    int appliedUiPitch = 8192, appliedUiMod = 0;
     juce::Synthesiser synth;
     std::shared_ptr<const rs::Model> sound;
     std::shared_ptr<const PreviewAudio> previewSound;
