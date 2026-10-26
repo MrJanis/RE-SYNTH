@@ -1,0 +1,74 @@
+name: Build RE-SYNTH installers (Windows EXE / macOS PKG)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'Source/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'packaging/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/native-plugins.yml'
+
+jobs:
+  windows-vst3-installer:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned JUCE
+        shell: pwsh
+        run: git clone --depth 1 --branch 8.0.16-security https://github.com/juce-framework/JUCE.git JUCE
+      - name: Run portable DSP regression tests
+        shell: pwsh
+        run: |
+          cmake -S tests -B build-tests -DCMAKE_BUILD_TYPE=Release
+          if ($LASTEXITCODE -ne 0) { throw 'Configure tests failed' }
+          cmake --build build-tests --config Release --parallel 3
+          if ($LASTEXITCODE -ne 0) { throw 'Build tests failed' }
+          ctest --test-dir build-tests --build-config Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw 'DSP tests failed' }
+      - name: Build VST3
+        shell: pwsh
+        env:
+          JUCE_DIR: ${{ github.workspace }}\JUCE
+        run: ./scripts/build-windows.ps1
+      - name: Install Inno Setup if missing
+        shell: pwsh
+        run: |
+          $candidates = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe")
+          if (-not ($candidates | Where-Object { Test-Path $_ })) {
+            choco install innosetup --no-progress --yes
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup install failed' }
+          }
+      - name: Package Windows installer
+        shell: pwsh
+        run: ./scripts/create-windows-installer.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RE-SYNTH-Windows-Installer
+          path: installers/RE-SYNTH-Setup-Windows.exe
+          if-no-files-found: error
+
+  macos-vst3-au-installer:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned JUCE
+        run: git clone --depth 1 --branch 8.0.16-security https://github.com/juce-framework/JUCE.git JUCE
+      - name: Run portable DSP regression tests
+        run: |
+          cmake -S tests -B build-tests -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-tests --parallel 3
+          ctest --test-dir build-tests --output-on-failure
+      - name: Build VST3 and AU
+        env:
+          JUCE_DIR: ${{ github.workspace }}/JUCE
+        run: bash scripts/build-macos.sh
+      - name: Package macOS installer
+        run: bash scripts/create-macos-installer.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RE-SYNTH-macOS-Installer
+          path: installers/RE-SYNTH-Installer-macOS.pkg
+          if-no-files-found: error
