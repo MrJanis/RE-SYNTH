@@ -86,6 +86,17 @@ ReSynthAudioProcessorEditor::ReSynthAudioProcessorEditor(ReSynthAudioProcessor& 
     modWheel.onValueChange=[this]{processor.setUiModWheel(static_cast<int>(std::lround(modWheel.getValue()*127.0)));};
     addAndMakeVisible(modWheel);
     for(auto* b : {&envelopeTab,&effectsTab,&masterTab})addAndMakeVisible(*b);
+    addAndMakeVisible(octaveDown);
+    addAndMakeVisible(octaveUp);
+    addAndMakeVisible(octaveValue);
+    octaveValue.setJustificationType(juce::Justification::centred);
+    octaveValue.setColour(juce::Label::textColourId,orange);
+    octaveValue.setFont(juce::Font(juce::FontOptions(12.f).withStyle("Bold")));
+    octaveDown.setTooltip("Shift on-screen keyboard down one octave (minimum -3)");
+    octaveUp.setTooltip("Shift on-screen keyboard up one octave (maximum +3)");
+    octaveDown.onClick=[this]{setKeyboardOctave(octaveOffset-1);};
+    octaveUp.onClick=[this]{setKeyboardOctave(octaveOffset+1);};
+    setKeyboardOctave(0);
     envelopeTab.onClick=[this]{showControlsPage(0);};
     effectsTab.onClick=[this]{showControlsPage(1);};
     masterTab.onClick=[this]{showControlsPage(2);};
@@ -108,6 +119,17 @@ void ReSynthAudioProcessorEditor::setupSlider(juce::Slider& s,const juce::String
     juce::ignoreUnused(attachment);
     s.setDoubleClickReturnValue(true,s.getValue());
 }
+void ReSynthAudioProcessorEditor::setKeyboardOctave(int offset) {
+    octaveOffset=juce::jlimit(-3,3,offset);
+    const int low=60+12*octaveOffset;
+    processor.keyboardState.allNotesOff(1);
+    keyboard.setAvailableRange(low,low+12);
+    keyboard.setLowestVisibleKey(static_cast<float>(low));
+    octaveValue.setText((octaveOffset>0 ? "+" : "") + juce::String(octaveOffset),juce::dontSendNotification);
+    octaveDown.setEnabled(octaveOffset>-3);
+    octaveUp.setEnabled(octaveOffset<3);
+    repaint();
+}
 void ReSynthAudioProcessorEditor::paint(juce::Graphics& g) {
     g.fillAll(bg);
     g.setColour(panel);
@@ -118,13 +140,13 @@ void ReSynthAudioProcessorEditor::paint(juce::Graphics& g) {
     g.drawText("1  IMPORT A NOTE",28,67,200,19,juce::Justification::left);
     g.drawText("2  A/B COMPARE",28,155,220,19,juce::Justification::left);
     g.drawText("SPECTRAL ANALYSIS",28,214,250,20,juce::Justification::left);
-    g.drawText("PERFORMANCE",28,484,160,20,juce::Justification::left);
+    g.drawText("PLAY THE INSTRUMENT",211,483,240,22,juce::Justification::left);
     g.setColour(juce::Colours::white.withAlpha(0.7f));
     g.setFont(11.f);
     g.drawText("CATEGORY",521,72,110,17,juce::Justification::left);
     g.drawText("ROOT NOTE",658,72,110,17,juce::Justification::left);
-    g.drawText("PITCH",29,563,76,20,juce::Justification::centred);
-    g.drawText("MOD",104,563,76,20,juce::Justification::centred);
+    g.drawText("PITCH",29,565,76,18,juce::Justification::centred);
+    g.drawText("MOD",104,565,76,18,juce::Justification::centred);
     g.drawText("C4 - C5  |  One-octave MIDI keyboard",219,567,542,18,juce::Justification::centred);
     g.setColour(cyan.withAlpha(0.75f));
     auto bounds=juce::Rectangle<float>(30,247,740,95);
@@ -213,10 +235,13 @@ void ReSynthAudioProcessorEditor::resized() {
     colors.setBounds(30,417,188,28);
     const std::array<juce::Slider*,3> master{&volume,&colorDrive,&timbreLock};
     for(int i=0;i<3;++i)master[static_cast<size_t>(i)]->setBounds(255+i*135,413,105,52);
-    pitchWheel.setBounds(40,510,53,51);
-    modWheel.setBounds(112,510,53,51);
+    octaveDown.setBounds(28,488,50,23);
+    octaveValue.setBounds(79,488,48,23);
+    octaveUp.setBounds(128,488,50,23);
+    pitchWheel.setBounds(40,515,53,47);
+    modWheel.setBounds(112,515,53,47);
     midiInfo.setBounds(582,483,180,19);
-    keyboard.setBounds(209,510,553,53);
+    keyboard.setBounds(209,512,553,53);
 }
 bool ReSynthAudioProcessorEditor::isInterestedInFileDrag(const juce::StringArray& files) {return files.size()>0 && juce::File(files[0]).hasFileExtension("wav;aif;aiff");}
 void ReSynthAudioProcessorEditor::filesDropped(const juce::StringArray& files,int,int) {if(!files.isEmpty())importFile(juce::File(files[0]));}
