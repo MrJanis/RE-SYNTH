@@ -110,11 +110,24 @@ void ReSynthAudioProcessorEditor::setupSlider(juce::Slider& s,const juce::String
 }
 void ReSynthAudioProcessorEditor::paint(juce::Graphics& g) {
     g.fillAll(bg);
-    g.setColour(panel);g.fillRoundedRectangle(16.f,90.f,768.f,265.f,10.f);
-    g.fillRoundedRectangle(16.f,365.f,768.f,140.f,10.f);
-    g.setColour(orange);g.setFont(13.f);g.drawText("SPECTRAL MODEL  •  16-VOICE INSTRUMENT",30,100,460,22,juce::Justification::left);
+    g.setColour(panel);
+    for(const auto r : {juce::Rectangle<float>(16,60,768,143),juce::Rectangle<float>(16,209,768,146),juce::Rectangle<float>(16,361,768,111),juce::Rectangle<float>(16,479,768,110)})
+        g.fillRoundedRectangle(r,9.f);
+    g.setColour(orange);
+    g.setFont(juce::Font(juce::FontOptions(12.f).withStyle("Bold")));
+    g.drawText("1  IMPORT A NOTE",28,67,200,19,juce::Justification::left);
+    g.drawText("2  A/B COMPARE",28,155,220,19,juce::Justification::left);
+    g.drawText("SPECTRAL ANALYSIS",28,214,250,20,juce::Justification::left);
+    g.drawText("PERFORMANCE",28,484,160,20,juce::Justification::left);
+    g.setColour(juce::Colours::white.withAlpha(0.7f));
+    g.setFont(11.f);
+    g.drawText("CATEGORY",521,72,110,17,juce::Justification::left);
+    g.drawText("ROOT NOTE",658,72,110,17,juce::Justification::left);
+    g.drawText("PITCH",29,563,76,20,juce::Justification::centred);
+    g.drawText("MOD",104,563,76,20,juce::Justification::centred);
+    g.drawText("C4 - C5  |  One-octave MIDI keyboard",219,567,542,18,juce::Justification::centred);
     g.setColour(cyan.withAlpha(0.75f));
-    auto bounds=juce::Rectangle<float>(30,220,740,117);
+    auto bounds=juce::Rectangle<float>(30,247,740,95);
     if (!waveform.empty()) {
         float step=bounds.getWidth()/static_cast<float>(waveform.size());
         for(size_t i=0;i<waveform.size();++i) {
@@ -157,29 +170,53 @@ void ReSynthAudioProcessorEditor::paint(juce::Graphics& g) {
             }
         }
     }
-    g.setColour(juce::Colours::white.withAlpha(0.45f));
-    g.drawText("ADSR",28,374,300,18,juce::Justification::left);
-    g.drawText("PER-SOUND EFFECT",409,374,350,18,juce::Justification::left);
-    g.drawText("EFFECT TYPE",420,507,150,18,juce::Justification::left);
-    g.drawText("MASTER COLOR",604,507,160,18,juce::Justification::left);
-    g.setColour(panel);g.fillRoundedRectangle(16.f,549.f,768.f,35.f,7.f);
-    g.setColour(juce::Colours::lightgrey);g.drawText("MIDI IN  •  Pitch bend ±2 st  •  88-key mapping  •  Project-contained sound model",26,554,735,22,juce::Justification::centred);
+
+    g.setFont(11.f);
+    g.setColour(juce::Colours::white.withAlpha(0.8f));
+    if (controlsPage == 0) {
+        const char* names[]={"ATTACK","DECAY","SUSTAIN","RELEASE"};
+        for(int i=0;i<4;++i)g.drawText(names[i],35+i*113,398,100,15,juce::Justification::centred);
+        g.drawText("Envelope (ADSR)",500,407,250,20,juce::Justification::centred);
+    } else if(controlsPage==1) {
+        g.drawText("EFFECT TYPE",31,398,190,16,juce::Justification::centred);
+        const char* names[]={"CONTROL 1","CONTROL 2","MIX / CTRL 3"};
+        for(int i=0;i<3;++i)g.drawText(names[i],257+i*120,398,112,15,juce::Justification::centred);
+    } else {
+        g.drawText("MASTER COLOR",31,398,190,16,juce::Justification::centred);
+        const char* names[]={"VOLUME","COLOR DRIVE","TIMBRE LOCK"};
+        for(int i=0;i<3;++i)g.drawText(names[i],250+i*135,398,114,15,juce::Justification::centred);
+    }
 }
 void ReSynthAudioProcessorEditor::resized() {
-    title.setBounds(18,10,280,53);colorDrive.setBounds(607,5,82,75);volume.setBounds(694,5,85,75);
-    timbreLock.setBounds(306,5,87,75);
-    originalButton.setBounds(30,164,132,28);resynthButton.setBounds(168,164,136,28);
-    stopButton.setBounds(310,164,70,28);qaInfo.setBounds(387,164,381,28);
-    importButton.setBounds(23,67,162,28);acceptButton.setBounds(193,67,183,28);saveButton.setBounds(386,67,110,28);
-    category.setBounds(520,69,150,26);
-    loadButton.setBounds(497,100,125,23);viewButton.setBounds(630,100,140,23);
-    status.setBounds(30,120,430,25);sampleInfo.setBounds(471,119,280,20);rootInfo.setBounds(471,138,170,20);
-    rootSelector.setBounds(648,138,120,22);
-    const std::array<juce::Slider*,4> envs{&attack,&decay,&sustain,&release};
-    for (int i=0;i<4;++i) envs[i]->setBounds(23+i*93,398,89,99);
+    title.setBounds(18,5,265,50);
+    status.setBounds(292,12,482,34);
+    importButton.setBounds(29,93,188,26);
+    loadButton.setBounds(226,93,121,26);
+    acceptButton.setBounds(354,93,149,26);
+    category.setBounds(518,93,120,26);
+    rootSelector.setBounds(650,93,119,26);
+    sampleInfo.setBounds(30,125,411,24);
+    rootInfo.setBounds(450,125,316,24);
+    originalButton.setBounds(29,177,123,22);
+    resynthButton.setBounds(159,177,131,22);
+    stopButton.setBounds(296,177,73,22);
+    qaInfo.setBounds(379,176,392,23);
+    viewButton.setBounds(618,213,148,26);
+    envelopeTab.setBounds(29,365,122,27);
+    effectsTab.setBounds(159,365,122,27);
+    masterTab.setBounds(289,365,122,27);
+    const std::array<juce::Slider*,4> env{&attack,&decay,&sustain,&release};
+    for(int i=0;i<4;++i)env[static_cast<size_t>(i)]->setBounds(39+i*113,413,93,52);
+    effects.setBounds(30,417,188,28);
     const std::array<juce::Slider*,3> fxs{&fx1,&fx2,&fx3};
-    for (int i=0;i<3;++i) fxs[i]->setBounds(428+i*108,398,101,99);
-    effects.setBounds(420,526,162,23);colors.setBounds(603,526,168,23);
+    for(int i=0;i<3;++i)fxs[static_cast<size_t>(i)]->setBounds(258+i*120,413,100,52);
+    colors.setBounds(30,417,188,28);
+    const std::array<juce::Slider*,3> master{&volume,&colorDrive,&timbreLock};
+    for(int i=0;i<3;++i)master[static_cast<size_t>(i)]->setBounds(255+i*135,413,105,52);
+    pitchWheel.setBounds(40,510,53,51);
+    modWheel.setBounds(112,510,53,51);
+    midiInfo.setBounds(582,483,180,19);
+    keyboard.setBounds(209,510,553,53);
 }
 bool ReSynthAudioProcessorEditor::isInterestedInFileDrag(const juce::StringArray& files) {return files.size()>0 && juce::File(files[0]).hasFileExtension("wav;aif;aiff");}
 void ReSynthAudioProcessorEditor::filesDropped(const juce::StringArray& files,int,int) {if(!files.isEmpty())importFile(juce::File(files[0]));}
