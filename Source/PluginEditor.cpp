@@ -3,7 +3,7 @@
 namespace {
 const auto bg=juce::Colour(0xff10171e), panel=juce::Colour(0xff1b2731), cyan=juce::Colour(0xff5ce0d5), orange=juce::Colour(0xffffa33b);
 }
-ReSynthAudioProcessorEditor::ReSynthAudioProcessorEditor(ReSynthAudioProcessor& p) : AudioProcessorEditor(&p), processor(p) {
+ReSynthAudioProcessorEditor::ReSynthAudioProcessorEditor(ReSynthAudioProcessor& p) : AudioProcessorEditor(&p), processor(p), keyboard(p.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard) {
     setSize(800,600);
     title.setText("◈  RE-SYNTH",juce::dontSendNotification);
     title.setFont(juce::Font(juce::FontOptions(29.f).withStyle("Bold")));
@@ -41,7 +41,7 @@ ReSynthAudioProcessorEditor::ReSynthAudioProcessorEditor(ReSynthAudioProcessor& 
     addAndMakeVisible(rootSelector);
     acceptButton.setEnabled(false);
     importButton.onClick=[this] {
-        chooser=std::make_unique<juce::FileChooser>("Choose a pitched note",juce::File{},"*.wav;*.aif;*.aiff");
+        chooser=std::make_unique<juce::FileChooser>("Choose a pitched note",juce::File{},"*");
         chooser->launchAsync(juce::FileBrowserComponent::openMode|juce::FileBrowserComponent::canSelectFiles,
           [safe=juce::Component::SafePointer<ReSynthAudioProcessorEditor>(this)](const juce::FileChooser& fc) {
             if(safe && fc.getResult().existsAsFile()) safe->importFile(fc.getResult());
@@ -59,9 +59,43 @@ ReSynthAudioProcessorEditor::ReSynthAudioProcessorEditor(ReSynthAudioProcessor& 
     setupSlider(sustain,"sustain","SUS");setupSlider(release,"release","REL");
     setupSlider(timbreLock,"timbreLock","TIMBRE");
     setupSlider(fx1,"fx1","CTRL 1");setupSlider(fx2,"fx2","CTRL 2");setupSlider(fx3,"fx3","MIX / CTRL 3");
+    midiInfo.setText("MIDI: ready",juce::dontSendNotification);
+    midiInfo.setColour(juce::Label::textColourId,cyan); addAndMakeVisible(midiInfo);
+    keyboard.setAvailableRange(60,72);
+    keyboard.setLowestVisibleKey(60.f);
+    keyboard.setScrollButtonsVisible(false);
+    keyboard.setKeyWidth(65.f);
+    keyboard.setMidiChannel(1);
+    addAndMakeVisible(keyboard);
+    pitchWheel.setSliderStyle(juce::Slider::LinearVertical);
+    pitchWheel.setTextBoxStyle(juce::Slider::NoTextBox,false,0,0);
+    pitchWheel.setRange(-1.0,1.0,0.001);
+    pitchWheel.setValue(0.0,juce::dontSendNotification);
+    pitchWheel.setTooltip("Pitch bend +/-2 semitones, spring return");
+    pitchWheel.onValueChange=[this]{
+        const double v=pitchWheel.getValue();
+        processor.setUiPitchWheel(8192+static_cast<int>(std::lround(v*(v<0?8192.0:8191.0))));
+    };
+    pitchWheel.onDragEnd=[this]{pitchWheel.setValue(0.0,juce::sendNotificationSync);};
+    addAndMakeVisible(pitchWheel);
+    modWheel.setSliderStyle(juce::Slider::LinearVertical);
+    modWheel.setTextBoxStyle(juce::Slider::NoTextBox,false,0,0);
+    modWheel.setRange(0.0,1.0,0.001);
+    modWheel.setValue(0.0,juce::dontSendNotification);
+    modWheel.setTooltip("MIDI CC1 modulation: vibrato depth");
+    modWheel.onValueChange=[this]{processor.setUiModWheel(static_cast<int>(std::lround(modWheel.getValue()*127.0)));};
+    addAndMakeVisible(modWheel);
+    for(auto* b : {&envelopeTab,&effectsTab,&masterTab})addAndMakeVisible(*b);
+    envelopeTab.onClick=[this]{showControlsPage(0);};
+    effectsTab.onClick=[this]{showControlsPage(1);};
+    masterTab.onClick=[this]{showControlsPage(2);};
+    showControlsPage(0);
+    resized();
     startTimerHz(12);
 }
 ReSynthAudioProcessorEditor::~ReSynthAudioProcessorEditor() {
+    processor.keyboardState.allNotesOff(1);
+    processor.setUiPitchWheel(8192);
     processor.installPreview({}); // discard source audio if editor closes without Accept
 }
 void ReSynthAudioProcessorEditor::setupSlider(juce::Slider& s,const juce::String& id,const juce::String& label) {
