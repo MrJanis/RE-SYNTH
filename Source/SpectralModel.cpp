@@ -111,7 +111,7 @@ std::vector<int> chooseKeyframes(int total) {
 }
 AnalysisResult analyzeFile(const juce::File& file) {
     AnalysisResult out;
-    if(!file.hasFileExtension("wav;aif;aiff")){out.error="Select a WAV or AIFF file.";return out;}
+    if(!file.hasFileExtension("wav;wave;aif;aiff")){out.error="Choose an uncompressed .wav, .aif or .aiff note.";return out;}
     juce::AudioFormatManager fm;fm.registerBasicFormats();
     std::unique_ptr<juce::AudioFormatReader> reader(fm.createReaderFor(file));
     if(!reader || reader->lengthInSamples<2048 || reader->sampleRate<=0) {
@@ -143,10 +143,12 @@ AnalysisResult analyzeFile(const juce::File& file) {
     }
     out.duration=n/reader->sampleRate;
     out.sampleRate=reader->sampleRate;
-    const double rootHz=pitch::estimatePitch(mono,reader->sampleRate);
-    if(!(rootHz>=45. && rootHz<=1500.)){
-        out.error="No stable single-note pitch found. Try a clean sustained note.";return out;
-    }
+    const double pitchGuess=pitch::estimatePitch(mono,reader->sampleRate);
+    out.pitchAutoDetected=std::isfinite(pitchGuess) && pitchGuess>=45. && pitchGuess<=1500.;
+    // Uncertain pitch should not be treated as an unsupported WAV file.
+    // Allow spectral analysis with an explicit manual MIDI root assignment.
+    // Frequencies still retain their measured absolute spectral positions.
+    const double rootHz=out.pitchAutoDetected ? pitchGuess : 261.625565;
     auto model=std::make_shared<Model>();
     model->name=file.getFileNameWithoutExtension();
     model->rootHz=rootHz;
