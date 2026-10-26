@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(ReSynth VERSION 0.5.0 LANGUAGES CXX)
+project(ReSynth VERSION 0.5.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Install JUCE locally, then configure with -DJUCE_DIR=/path/to/JUCE
