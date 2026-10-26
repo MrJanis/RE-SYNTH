@@ -12,11 +12,13 @@ public:
     void filesDropped(const juce::StringArray&,int,int) override;
 private:
     ReSynthAudioProcessor& processor;
+    juce::MidiKeyboardComponent keyboard;
     juce::TextButton importButton{"1  LOAD WAV / AIFF"}, acceptButton{"3  ACCEPT SOUND"}, saveButton{"SAVE SOUND"}, loadButton{"OPEN SOUND"}, viewButton{"SHOW EVOLUTION"}, originalButton{"A: ORIGINAL"}, resynthButton{"B: RESYNTH"}, stopButton{"STOP"};
     juce::TextButton envelopeTab{"ENVELOPE"}, effectsTab{"EFFECTS"}, masterTab{"MASTER"};
     juce::ComboBox effects, colors, category, rootSelector;
     juce::Label title, status, sampleInfo, rootInfo, qaInfo, midiInfo;
     juce::Slider volume, colorDrive, timbreLock, attack, decay, sustain, release, fx1, fx2, fx3;
+    juce::Slider pitchWheel, modWheel;
     juce::OwnedArray<juce::AudioProcessorValueTreeState::SliderAttachment> sliderAttachments;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> fxAttachment, colorAttachment;
     std::unique_ptr<juce::FileChooser> chooser;
